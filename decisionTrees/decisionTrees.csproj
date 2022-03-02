@@ -16,13 +16,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Update="data\a280.txt">
+	  <None Update="data\gielda.txt">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-	  <None Update="data\berlin52.txt">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="data\test.txt">
+	  <None Update="data\testowaTabDec.txt">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
 	</ItemGroup>

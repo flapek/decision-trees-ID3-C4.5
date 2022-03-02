@@ -1,6 +1,5 @@
 ﻿using CommandLine;
-
-namespace applications_of_artificial_intelligence_1
+namespace decisionTrees
 {
     internal sealed class CommandLineOptions
     {
