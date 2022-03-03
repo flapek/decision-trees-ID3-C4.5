@@ -1,5 +1,4 @@
-﻿using decisionTrees;
-using CommandLine;
+﻿using CommandLine;
 using System.Diagnostics;
 
 await Parser.Default.ParseArguments<CommandLineOptions>(args)
@@ -13,7 +12,7 @@ await Parser.Default.ParseArguments<CommandLineOptions>(args)
             var matrix = await ReadFileAsync(reader);
             var attributes = await CountAtributes(matrix);
 
-            //attributes.Display();
+            attributes.Display();
 
             stopwatch.Stop();
             Console.WriteLine("Elapsed time in miliseconds: {0}", stopwatch.ElapsedMilliseconds);
@@ -30,11 +29,21 @@ await Parser.Default.ParseArguments<CommandLineOptions>(args)
 ValueTask<List<Attribute>> CountAtributes(List<object[]> matrix)
 {
     List<Attribute> result = new();
-    for (int i = 0; i < matrix[0].Length; i++)
-        result.Add(new Attribute(i, matrix.Select(x => x[i])
+    var attributesCount = matrix[0].Length;
+    var decisions = matrix.Select(x => x[attributesCount - 1]).ToArray();
+    for (int i = 0; i < attributesCount; i++)
+    {
+        var a = matrix.Select(x => x[i]);
+        var classes = a
             .GroupBy(x => x).ToDictionary(x => x.Key,
-            y => y.Select(g => g).Sum(s => 1))));
+            y => y.Select(g => g).Sum(s => 1));
+        var attribute = new Attribute(i, classes);
 
+        if (i != attributesCount-1)
+            attribute.Info(a.ToArray(), decisions);
+
+        result.Add(attribute);
+    }
     return new(result);
 }
 
