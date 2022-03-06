@@ -2,11 +2,11 @@
   "profiles": {
     "gielda": {
       "commandName": "Project",
-      "commandLineArgs": "-d .\\data\\gielda.txt"
+      "commandLineArgs": "-d ./data/gielda.txt"
     },
     "test": {
       "commandName": "Project",
-      "commandLineArgs": "-d .\\data\\testowaTabDec.txt"
+      "commandLineArgs": "-d ./data/testowaTabDec.txt"
     }
   }
 }

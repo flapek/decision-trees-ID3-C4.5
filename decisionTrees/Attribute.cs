@@ -1,20 +1,32 @@
 ﻿internal class Attribute
 {
     public int Index { get; }
+    public IEnumerable<object> Values { get; }
     public Dictionary<object, int> Classes { get; }
-    public double Entropy { get; }
-    public double InformationValue { get; private set; }
+    public double InfoT { get; private set; }
+    public double InfoAnT { get; private set; }
+    public double GainAnT { get; private set; }
+    public double SplitInfoAnT { get; private set; }
+    public double GainRatioAnT { get; private set; }
 
     private readonly double _objects;
-    public Attribute(int index, Dictionary<object, int> classes)
+
+    public Attribute(int index, object[] values, double infoT)
     {
         Index = index;
-        Classes = classes;
-        
-        _objects = Classes.Select(x => x.Value).Sum(x => x);
-        Entropy = Math.Info(Classes.Values.Select(v => v / _objects).ToArray());
+        Values = values;
+        InfoT = infoT;
+        Classes = values.GroupBy(x => x).ToDictionary(x => x.Key,
+            y => y.Select(g => g).Sum(s => 1));
+        _objects = values.Length;
     }
 
-    internal void Info(object[] classes, object[] decisions)
-        => InformationValue = Math.Info(Classes.Values.Select(v => v / _objects).ToArray(), classes, decisions);
+    internal async Task Calculate(object[] decisions)
+    {
+        var probabilities = Classes.Values.Select(v => v / _objects).ToArray();
+        InfoAnT = await Math.Info(probabilities, Values.ToArray(), decisions);
+        GainAnT = await Math.Gain(InfoT, InfoAnT);
+        SplitInfoAnT = await Math.SplitInfo(probabilities);
+        GainRatioAnT = await Math.GainRatio(GainAnT, SplitInfoAnT);
+    }
 }
