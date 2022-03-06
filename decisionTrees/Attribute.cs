@@ -1,4 +1,6 @@
-﻿internal class Attribute
+﻿namespace decisionTrees;
+
+internal class Attribute
 {
     public int Index { get; }
     public IEnumerable<object> Values { get; }
@@ -14,7 +16,7 @@
     public Attribute(int index, object[] values, double infoT)
     {
         Index = index;
-        Values = values;
+        Values = values ?? throw new ArgumentNullException(nameof(values));
         InfoT = infoT;
         Classes = values.GroupBy(x => x).ToDictionary(x => x.Key,
             y => y.Select(g => g).Sum(s => 1));

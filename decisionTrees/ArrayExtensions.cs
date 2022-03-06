@@ -1,4 +1,6 @@
-﻿internal static class ArrayExtensions
+﻿namespace decisionTrees;
+
+internal static class ArrayExtensions
 {
     public static void Display(this List<object[]> array)
     {
@@ -16,7 +18,8 @@
         {
             foreach (var value in item.Classes)
                 Console.Write("{0}. {1}-{2} ", item.Index, value.Key, value.Value);
-            Console.WriteLine("{0}. Info(T) {1}, Info(an,T) {2}, Gain(an,T) {3}, SplitInfo(an,T) {4}, GainRatio(an,T) {5}", 
+            Console.WriteLine(
+                "{0}. Info(T) {1}, Info(an,T) {2}, Gain(an,T) {3}, SplitInfo(an,T) {4}, GainRatio(an,T) {5}",
                 item.Index, item.InfoT, item.InfoAnT, item.GainAnT, item.SplitInfoAnT, item.GainRatioAnT);
             Console.WriteLine();
         }

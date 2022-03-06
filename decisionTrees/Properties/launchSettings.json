@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "gielda": {
+    "stockMarket": {
       "commandName": "Project",
       "commandLineArgs": "-d ./data/gielda.txt"
     },

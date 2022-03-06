@@ -1,4 +1,6 @@
-﻿internal static class Math
+﻿namespace decisionTrees;
+
+internal static class Math
 {
     public static ValueTask<double> Info(double[] probabilities)
         => new(-probabilities.Sum(p => p == 0 ? 0 : p * System.Math.Log2(p)));
