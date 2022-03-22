@@ -6,8 +6,8 @@ internal static class ArrayExtensions
     {
         foreach (var item in array)
         {
-            for (int j = 0; j < item.Length; j++)
-                Console.Write("{0}(type: {1}) ", item[j], item[j].GetType());
+            foreach (var t in item)
+                Console.Write("{0}(type: {1}) ", t, t.GetType());
             Console.WriteLine();
         }
     }
@@ -16,8 +16,8 @@ internal static class ArrayExtensions
     {
         foreach (var item in attributes)
         {
-            foreach (var value in item.Classes)
-                Console.Write("{0}. {1}-{2} ", item.Index, value.Key, value.Value);
+            foreach (var (key, value) in item.Classes)
+                Console.Write("{0}. {1}-{2} ", item.Index, key, value);
             Console.WriteLine(
                 "{0}. Info(T) {1}, Info(an,T) {2}, Gain(an,T) {3}, SplitInfo(an,T) {4}, GainRatio(an,T) {5}",
                 item.Index, item.InfoT, item.InfoAnT, item.GainAnT, item.SplitInfoAnT, item.GainRatioAnT);
