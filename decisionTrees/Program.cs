@@ -15,8 +15,11 @@ await Parser.Default.ParseArguments<CommandLineOptions>(args)
             var matrix = await ReadFileAsync(reader);
             var attributes = await CountAttributes(matrix);
 
-            attributes.Display();
+            var we = attributes.Where(x => x.Index != attributes.Count - 1).FirstOrDefault(x =>
+                System.Math.Abs(x.GainRatioAnT - attributes.Max(attribute => attribute.GainRatioAnT)) < 0.000001);
 
+            
+            
             stopwatch.Stop();
             Console.WriteLine("Elapsed time in milliseconds: {0}", stopwatch.ElapsedMilliseconds);
             return 0;
@@ -46,7 +49,7 @@ async ValueTask<List<Attribute>> CountAttributes(IReadOnlyList<object[]> matrix)
         result.Add(attribute);
     }
 
-    return new List<Attribute>(result);
+    return result;
 }
 
 async ValueTask<List<object[]>> ReadFileAsync(StreamReader reader)
@@ -57,4 +60,18 @@ async ValueTask<List<object[]>> ReadFileAsync(StreamReader reader)
         result.Add((await reader.ReadLineAsync() ?? "").Trim().Split(' ').Select(s => s as object).ToArray());
 
     return result;
+}
+
+Task BuildTree(int index, int startedIndex, IReadOnlyList<Attribute> attributes)
+{
+    if (attributes.FirstOrDefault(x=>x.Index == startedIndex)!.GainRatioAnT != 0)
+    {
+        
+    }
+    else
+    {
+        
+    }
+    
+    return Task.CompletedTask;
 }
