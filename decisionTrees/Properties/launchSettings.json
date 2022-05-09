@@ -7,6 +7,10 @@
     "test": {
       "commandName": "Project",
       "commandLineArgs": "-d ./data/testowaTabDec.txt"
+    },
+    "car": {
+      "commandName": "Project",
+      "commandLineArgs": "-d ./data/car.data -s ,"
     }
   }
 }
