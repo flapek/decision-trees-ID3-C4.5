@@ -25,9 +25,12 @@
 	  <None Update="data\car.data">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-		<None Update="data\car_data.txt">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+	  <None Update="data\car_data.txt">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="data\breast-cancer.data">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
 	</ItemGroup>
 
 </Project>

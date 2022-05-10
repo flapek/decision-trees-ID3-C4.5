@@ -31,18 +31,17 @@ async ValueTask<List<object[]>> ReadFileAsync(StreamReader reader, char separato
 
 async Task BuildTree(IReadOnlyList<object[]> data)
 {
-    var decisions = data.Select(x => x.Last()).GroupBy(x=> x).Select(x=>x.Key).ToArray();
-    if (decisions.Length != 1)
+    var decisions = data.Select(x => x.Last()).GroupBy(x => x).Select(x => x.Key).ToArray();
+    var (idx, ratio) = await FindTheBest(data);
+    if (ratio != 0)
     {
         ++tabs;
-        var idx = await FindTheBest(data);
         stringBuilder.Append($"Attribute: {idx}");
         var sort = await Sort(idx, data);
         foreach (var d in sort)
         {
             stringBuilder.Append('\n');
-            for (var i = 0; i < tabs; i++)
-                stringBuilder.Append('\t');
+            for (var i = 0; i < tabs; i++) stringBuilder.Append('\t');
             stringBuilder.Append($"{d[0][idx]} -> ");
 
             await BuildTree(d);
@@ -58,7 +57,7 @@ Task<List<object[][]>> Sort(int idx, IReadOnlyList<object[]> data)
 {
     var attribute = data.Select(el => el[idx]);
     var result = new List<object[][]>();
-    
+
     foreach (var uniq in attribute.GroupBy(x => x))
     {
         var temp = new List<object[]>();
@@ -71,18 +70,17 @@ Task<List<object[][]>> Sort(int idx, IReadOnlyList<object[]> data)
     return Task.FromResult(result);
 }
 
-ValueTask<int> FindTheBest(IReadOnlyList<object[]> data)
+ValueTask<(int idx, double ratio)> FindTheBest(IReadOnlyList<object[]> data)
 {
     var temporary = Enumerable.Range(0, data[0].Length - 1).Select(idx => Calculate(idx, data).Result).ToArray();
     var max = temporary.Max();
-    return ValueTask.FromResult(Array.IndexOf(temporary, max));
+    return ValueTask.FromResult((Array.IndexOf(temporary, max), max));
 }
 
 async ValueTask<double> Calculate(int idx, IReadOnlyList<object[]> data)
 {
     var values = data.Select(el => el[idx]).ToArray();
-    var classes = values.GroupBy(x => x).ToDictionary(x => x.Key,
-        y => y.Select(g => g).Sum(_ => 1));
+    var classes = values.GroupBy(x => x).ToDictionary(x => x.Key, y => y.Select(g => g).Sum(_ => 1));
     var decisions = data.Select(el => el.LastOrDefault()!).ToArray();
 
     var probabilities = classes.Values.Select(v => v / (double) values.Length).ToArray();

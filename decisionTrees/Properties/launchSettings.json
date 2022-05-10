@@ -11,6 +11,10 @@
     "car": {
       "commandName": "Project",
       "commandLineArgs": "-d ./data/car.data -s ,"
+    },
+    "cancer": {
+      "commandName": "Project",
+      "commandLineArgs": "-d ./data/breast-cancer.data -s ,"
     }
   }
 }

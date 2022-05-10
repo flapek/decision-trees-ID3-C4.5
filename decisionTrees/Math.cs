@@ -36,7 +36,7 @@ internal static class Math
         => new(infoT - infoAnT);
 
     public static ValueTask<double> GainRatio(double gainAnT, double splitInfoAnT) 
-        => new(gainAnT / splitInfoAnT);
+        => new(splitInfoAnT == 0 ? 0 : gainAnT / splitInfoAnT);
 
     public static async Task<double> SplitInfo(double[] probabilities) 
         => await Info(probabilities);
