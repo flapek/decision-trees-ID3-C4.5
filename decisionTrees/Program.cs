@@ -3,17 +3,22 @@ using System.Diagnostics;
 using decisionTrees;
 using Math = decisionTrees.Math;
 
- int tabs = 0;
+var tabs = 0;
 await Parser.Default.ParseArguments<CommandLineOptions>(args)
     .MapResult(async args =>
     {
         var stopwatch = Stopwatch.StartNew();
         using StreamReader reader = new(args.Path ?? string.Empty);
-        // var (trainingSet, testSet) = await SplitData(ReadFileAsync(reader, args.Separator));
+        var (trainingSet, testSet) = await SplitData(ReadFileAsync(reader, args.Separator));
 
-        var node = new Node(await ReadFileAsync(reader, args.Separator));
+        trainingSet = trainingSet.ToList();
+        var node = new Node(trainingSet.ToList());
         await BuildTree(node);
-        await DisplayTree(node);
+        // await DisplayTree(node);
+
+        var failMatrix = await BuildFailMatrix(testSet.ToList(), node, 
+            trainingSet.ToList().Select(x => x.Last()).GroupBy(x => x).Select(x => x.Key).ToArray());
+        
         stopwatch.Stop();
         Console.WriteLine("\nElapsed time in milliseconds: {0}", stopwatch.ElapsedMilliseconds);
         return 0;
@@ -127,11 +132,48 @@ async ValueTask<double> Calculate(int idx, IReadOnlyList<object[]> data)
     return await Math.GainRatio(gainAnT, splitInfoAnT);
 }
 
+async ValueTask<object[][]> BuildFailMatrix(IReadOnlyList<object[]> testSet, Node tree, IReadOnlyList<object> decisions)
+{
+    var result = new object[decisions.Count][];
+    for (var i = 0; i < decisions.Count; i++)
+    {
+        result[i] = new object[decisions.Count + 1];
+        result[i][0] = decisions[i];
+    }
+
+    foreach (var test in testSet)
+    {
+        var (testDecision, treeDecision) = await Test(test, tree);
+    }
+    
+    
+    return result;
+}
+
+ValueTask<(object testDecision, object treeDecision)> Test(object[] test, Node tree)
+{
+    var testDecision = test.Last();
+    object treeDecision = 0;
+
+    var node = tree;
+    while (node.Childs.Any())
+    {
+
+        var a = test[(int) node.Attribute];
+
+        node = node.Childs.FirstOrDefault(x => x.Value == a);
+
+    }
+    
+    return ValueTask.FromResult((testDecision, treeDecision));
+}
+
+
 internal class Node
 {
     public IReadOnlyList<object[]> Data { get; }
     public List<Node> Childs { get; }
-    public object? Attribute { get; set; }
+    public int? Attribute { get; set; }
     public object? Decision { get; set; }
     public object? Value { get; set; }
 
