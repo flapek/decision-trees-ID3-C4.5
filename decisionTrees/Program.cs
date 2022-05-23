@@ -3,7 +3,6 @@ using System.Diagnostics;
 using decisionTrees;
 using Math = decisionTrees.Math;
 
-var tabs = 0;
 await Parser.Default.ParseArguments<CommandLineOptions>(args)
     .MapResult(async args =>
     {
@@ -14,10 +13,21 @@ await Parser.Default.ParseArguments<CommandLineOptions>(args)
         trainingSet = trainingSet.ToList();
         var node = new Node(trainingSet.ToList());
         await BuildTree(node);
-        // await DisplayTree(node);
+        // await DisplayTree(node, 0);
 
-        var failMatrix = await BuildFailMatrix(testSet.ToList(), node, 
+        var (confusionMatrix, notClassified) = await BuildConfusionMatrix(testSet.ToList(), node,
             trainingSet.ToList().Select(x => x.Last()).GroupBy(x => x).Select(x => x.Key).ToArray());
+
+
+        await Display(confusionMatrix);
+        Console.WriteLine("Not classified {0}", notClassified);
+        Console.WriteLine("Accuracy {0}", await Accuracy(confusionMatrix));
+        var sensitivity = await Sensitivity(confusionMatrix);
+        Console.WriteLine("Sensitivity {0}", sensitivity);
+        var precision = await Precision(confusionMatrix);
+        Console.WriteLine("Precision {0}", precision);
+        Console.WriteLine("F-measure {0}", await FMeasure(precision, sensitivity));
+        Console.WriteLine("Matthews correlation coefficient {0}", await MatthewsCorrelationCoefficient(confusionMatrix));
         
         stopwatch.Stop();
         Console.WriteLine("\nElapsed time in milliseconds: {0}", stopwatch.ElapsedMilliseconds);
@@ -34,7 +44,8 @@ async ValueTask<List<object[]>> ReadFileAsync(StreamReader reader, char separato
     return result;
 }
 
-async ValueTask<(IEnumerable<object[]> trainingSet, IEnumerable<object[]> testSet)> SplitData(ValueTask<List<object[]>> readFileAsync)
+async ValueTask<(IEnumerable<object[]> trainingSet, IEnumerable<object[]> testSet)> SplitData(
+    ValueTask<List<object[]>> readFileAsync)
 {
     var data = await readFileAsync;
 
@@ -42,8 +53,7 @@ async ValueTask<(IEnumerable<object[]> trainingSet, IEnumerable<object[]> testSe
     min = min == 0 ? 1 : min;
     var max = (int) (data.Count * 0.3);
     var testSet = data.OrderBy(_ => Random.Shared.Next()).Take(Random.Shared.Next(min, max)).ToList();
-    foreach (var x in testSet)
-        data.Remove(x);
+    foreach (var x in testSet) data.Remove(x);
 
     return (data, testSet);
 }
@@ -56,13 +66,9 @@ async Task BuildTree(Node node)
     {
         node.Attribute = idx;
         var sort = await Sort(idx, node.Data);
-        foreach (var d in sort)
+        foreach (var child in sort.Select(d => new Node(d) {Value = d[0][idx]}))
         {
-            var child = new Node(d)
-            {
-                Value = d[0][idx]
-            };
-            node.Childs.Add(child);
+            node.Nodes.Add(child);
             await BuildTree(child);
         }
     }
@@ -70,19 +76,20 @@ async Task BuildTree(Node node)
         node.Decision = decisions[0];
 }
 
-async Task DisplayTree(Node tree)
+// ReSharper disable once UnusedLocalFunction
+async Task DisplayTree(Node tree, int tabs)
 {
-    if (tree.Childs.Count != 0)
+    if (tree.Nodes.Count != 0)
     {
         ++tabs;
         Console.Write($"Attribute: {tree.Attribute}");
-        foreach (var child in tree.Childs)
+        foreach (var child in tree.Nodes)
         {
             Console.Write('\n');
             for (var i = 0; i < tabs; i++) Console.Write('\t');
             Console.Write($"{child.Value} -> ");
 
-            await DisplayTree(child);
+            await DisplayTree(child, ++tabs);
         }
         --tabs;
     }
@@ -90,19 +97,25 @@ async Task DisplayTree(Node tree)
         Console.Write($"Decision: {tree.Decision}");
 }
 
+Task Display(int[,] confusionMatrix)
+{
+    Console.WriteLine("Fail matrix:");
+    for (var i = 0; i < confusionMatrix.GetLength(0); i++)
+    {
+        Console.Write("| ");
+        for (var j = 0; j < confusionMatrix.GetLength(0); j++)
+        {
+            Console.Write("{0} ", confusionMatrix[i, j]); 
+        }
+        Console.WriteLine(" |");
+    }
+    return Task.CompletedTask;
+}
+
 Task<List<object[][]>> Sort(int idx, IReadOnlyList<object[]> data)
 {
     var attribute = data.Select(el => el[idx]);
-    var result = new List<object[][]>();
-
-    foreach (var uniq in attribute.GroupBy(x => x))
-    {
-        var temp = new List<object[]>();
-        foreach (var d in data)
-            if (d[idx].Equals(uniq.Key))
-                temp.Add(d);
-        result.Add(temp.ToArray());
-    }
+    var result = attribute.GroupBy(x => x).Select(uniq => data.Where(d => d[idx].Equals(uniq.Key)).ToArray()).ToList();
 
     return Task.FromResult(result);
 }
@@ -132,54 +145,100 @@ async ValueTask<double> Calculate(int idx, IReadOnlyList<object[]> data)
     return await Math.GainRatio(gainAnT, splitInfoAnT);
 }
 
-async ValueTask<object[][]> BuildFailMatrix(IReadOnlyList<object[]> testSet, Node tree, IReadOnlyList<object> decisions)
+async Task<(int[,] confusionMatrix, int notClassified)> BuildConfusionMatrix(IEnumerable<object[]> testSet, Node tree, object[] decisions)
 {
-    var result = new object[decisions.Count][];
-    for (var i = 0; i < decisions.Count; i++)
-    {
-        result[i] = new object[decisions.Count + 1];
-        result[i][0] = decisions[i];
-    }
-
+    var result = new int[decisions.Length, decisions.Length];
+    var notClassified = 0;
     foreach (var test in testSet)
     {
         var (testDecision, treeDecision) = await Test(test, tree);
+        var indexOfTestDecision = Array.IndexOf(decisions, testDecision);
+        var indexOfTreeDecision = Array.IndexOf(decisions, treeDecision);
+
+        if (indexOfTestDecision == -1 || indexOfTreeDecision == -1)
+        {
+            ++notClassified;
+            continue;
+        }
+
+        ++result[indexOfTestDecision, indexOfTreeDecision];
     }
-    
-    
-    return result;
+
+    return (result, notClassified);
 }
 
-ValueTask<(object testDecision, object treeDecision)> Test(object[] test, Node tree)
+ValueTask<(object testDecision, object? treeDecision)> Test(IReadOnlyList<object> test, Node tree)
 {
-    var testDecision = test.Last();
-    object treeDecision = 0;
-
     var node = tree;
-    while (node.Childs.Any())
+    while (node != null && node.Nodes.Any())
     {
-
         var a = test[(int) node.Attribute];
-
-        node = node.Childs.FirstOrDefault(x => x.Value == a);
-
+        node = node.Nodes.FirstOrDefault(x => x.Value != null && x.Value.Equals(a));
     }
-    
-    return ValueTask.FromResult((testDecision, treeDecision));
+
+    return ValueTask.FromResult((test[^1], node?.Decision));
 }
 
+ValueTask<double> Accuracy(int[,] confusionMatrix)
+{
+    var numerator = 0d;
+    var denominator = 0d;
+
+    for (var i = 0; i < confusionMatrix.GetLength(0); i++)
+    {
+        for (var j = 0; j < confusionMatrix.GetLength(0); j++)
+        {
+            if (i == j)
+                numerator += confusionMatrix[i, j];
+            else
+                denominator += confusionMatrix[i, j];
+        }
+    }
+    
+    return ValueTask.FromResult(denominator != 0 ? numerator/denominator : 0d);
+}
+
+ValueTask<double> Sensitivity(int[,] confusionMatrix)
+{
+    var numerator = (double)confusionMatrix[0,0];
+    var denominator = 0d;
+
+    for (var i = 0; i < confusionMatrix.GetLength(0); i++)
+        denominator += confusionMatrix[0, i];
+    
+    return ValueTask.FromResult(denominator != 0 ? numerator/denominator : 0d);
+}
+
+ValueTask<double> Precision(int[,] confusionMatrix)
+{
+    var numerator = (double)confusionMatrix[0,0];
+    var denominator = 0d;
+
+    for (var i = 0; i < confusionMatrix.GetLength(0); i++)
+        denominator += confusionMatrix[i, 0];
+    
+    return ValueTask.FromResult(denominator != 0 ? numerator/denominator : 0d);
+}
+
+ValueTask<double> FMeasure(double precision, double sensitivity) 
+    => ValueTask.FromResult(precision * sensitivity/(precision + sensitivity));
+
+ValueTask<double> MatthewsCorrelationCoefficient(int[,] confusionMatrix) =>
+    ValueTask.FromResult((confusionMatrix[0,0] * confusionMatrix[1,1] - confusionMatrix[0,1] * confusionMatrix[1,0]) / 
+                         System.Math.Sqrt((confusionMatrix[0,0] + confusionMatrix[1,0]) * (confusionMatrix[0,0] + confusionMatrix[0,1]) * 
+                                          (confusionMatrix[1,0] + confusionMatrix[1,1]) * (confusionMatrix[1,1] + confusionMatrix[0,1])));
 
 internal class Node
 {
     public IReadOnlyList<object[]> Data { get; }
-    public List<Node> Childs { get; }
+    public List<Node> Nodes { get; }
     public int? Attribute { get; set; }
     public object? Decision { get; set; }
-    public object? Value { get; set; }
+    public object? Value { get; init; }
 
     public Node(IReadOnlyList<object[]> data)
     {
         Data = data;
-        Childs = new List<Node>();
+        Nodes = new List<Node>();
     }
 }
