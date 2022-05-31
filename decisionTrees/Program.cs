@@ -8,7 +8,7 @@ await Parser.Default.ParseArguments<CommandLineOptions>(args)
     {
         var stopwatch = Stopwatch.StartNew();
         using StreamReader reader = new(args.Path ?? string.Empty);
-        var (trainingSet, testSet) = await SplitData(ReadFileAsync(reader, args.Separator));
+        var (trainingSet, testSet) = await SplitData(ReadFileAsync(reader, args.Separator), 0.30);
 
         trainingSet = trainingSet.ToList();
         var node = new Node(trainingSet.ToList());
@@ -18,15 +18,14 @@ await Parser.Default.ParseArguments<CommandLineOptions>(args)
         var (confusionMatrix, notClassified) = await BuildConfusionMatrix(testSet.ToList(), node,
             trainingSet.ToList().Select(x => x.Last()).GroupBy(x => x).Select(x => x.Key).ToArray());
 
-
         await Display(confusionMatrix);
         Console.WriteLine("Not classified {0}", notClassified);
         Console.WriteLine("Accuracy {0}", await Accuracy(confusionMatrix));
-        var sensitivity = await Sensitivity(confusionMatrix);
-        Console.WriteLine("Sensitivity {0}", sensitivity);
+        var recall = await Recall(confusionMatrix);
+        Console.WriteLine("Recall {0}", recall);
         var precision = await Precision(confusionMatrix);
         Console.WriteLine("Precision {0}", precision);
-        Console.WriteLine("F-measure {0}", await FMeasure(precision, sensitivity));
+        Console.WriteLine("F-measure {0}", await FMeasure(precision, recall));
         Console.WriteLine("Matthews correlation coefficient {0}", await MatthewsCorrelationCoefficient(confusionMatrix));
         
         stopwatch.Stop();
@@ -45,14 +44,12 @@ async ValueTask<List<object[]>> ReadFileAsync(StreamReader reader, char separato
 }
 
 async ValueTask<(IEnumerable<object[]> trainingSet, IEnumerable<object[]> testSet)> SplitData(
-    ValueTask<List<object[]>> readFileAsync)
+    ValueTask<List<object[]>> readFileAsync, double percentageToTake)
 {
     var data = await readFileAsync;
 
-    var min = (int) (data.Count * 0.1);
-    min = min == 0 ? 1 : min;
-    var max = (int) (data.Count * 0.3);
-    var testSet = data.OrderBy(_ => Random.Shared.Next()).Take(Random.Shared.Next(min, max)).ToList();
+    var take = (int) (data.Count * percentageToTake);
+    var testSet = data.OrderBy(_ => Random.Shared.Next()).Take(take).ToList();
     foreach (var x in testSet) data.Remove(x);
 
     return (data, testSet);
@@ -172,7 +169,7 @@ ValueTask<(object testDecision, object? treeDecision)> Test(IReadOnlyList<object
     var node = tree;
     while (node != null && node.Nodes.Any())
     {
-        var a = test[(int) node.Attribute];
+        var a = test[node.Attribute ?? 0];
         node = node.Nodes.FirstOrDefault(x => x.Value != null && x.Value.Equals(a));
     }
 
@@ -190,15 +187,36 @@ ValueTask<double> Accuracy(int[,] confusionMatrix)
         {
             if (i == j)
                 numerator += confusionMatrix[i, j];
-            else
-                denominator += confusionMatrix[i, j];
+            denominator += confusionMatrix[i, j];
         }
     }
     
     return ValueTask.FromResult(denominator != 0 ? numerator/denominator : 0d);
 }
 
-ValueTask<double> Sensitivity(int[,] confusionMatrix)
+ValueTask<double> Recall(int[,] confusionMatrix) => confusionMatrix.GetLength(0) > 2 
+    ? RecallForNDecisionClass(confusionMatrix) 
+    : RecallForTwoDecisionClass(confusionMatrix);
+
+ValueTask<double> RecallForNDecisionClass(int[,] confusionMatrix)
+{
+    var result = 0d;
+
+    for (var i = 0; i < confusionMatrix.GetLength(0); i++)
+    {
+        var numerator = (double)confusionMatrix[i,i];
+        var denominator = 0d; 
+        
+        for (var j = 0; j < confusionMatrix.GetLength(0); j++)
+            denominator += confusionMatrix[i, j];
+        
+        result += denominator != 0 ? numerator / denominator : 0d;
+    }
+    
+    return ValueTask.FromResult(1d/confusionMatrix.GetLength(0) * result);
+}
+
+ValueTask<double> RecallForTwoDecisionClass(int[,] confusionMatrix)
 {
     var numerator = (double)confusionMatrix[0,0];
     var denominator = 0d;
@@ -209,7 +227,29 @@ ValueTask<double> Sensitivity(int[,] confusionMatrix)
     return ValueTask.FromResult(denominator != 0 ? numerator/denominator : 0d);
 }
 
-ValueTask<double> Precision(int[,] confusionMatrix)
+ValueTask<double> Precision(int[,] confusionMatrix) => confusionMatrix.GetLength(0) > 2 
+    ? PrecisionForNDecisionClass(confusionMatrix) 
+    : PrecisionForTwoDecisionClass(confusionMatrix);
+
+ValueTask<double> PrecisionForNDecisionClass(int[,] confusionMatrix)
+{
+    var result = 0d;
+
+    for (var i = 0; i < confusionMatrix.GetLength(0); i++)
+    {
+        var numerator = (double)confusionMatrix[i,i];
+        var denominator = 0d; 
+        
+        for (var j = 0; j < confusionMatrix.GetLength(0); j++)
+            denominator += confusionMatrix[j, i];
+        
+        result += denominator != 0 ? numerator / denominator : 0d;
+    }
+    
+    return ValueTask.FromResult(1d/confusionMatrix.GetLength(0) * result);
+}
+
+ValueTask<double> PrecisionForTwoDecisionClass(int[,] confusionMatrix)
 {
     var numerator = (double)confusionMatrix[0,0];
     var denominator = 0d;
