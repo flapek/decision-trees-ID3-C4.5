@@ -8,5 +8,12 @@ internal sealed class CommandLineOptions
     public string? Path { get; set; }
     [Option('s', "separator", Required = false, HelpText = "Separator", Default = ' ')]
     public char Separator { get; set; }
+    [Option('a', "algorithm", Required = false, HelpText = "Algorithm type validation", Default = 0)]
+    public AlgorithmTypeValidation AlgorithmTypeValidation { get; set; }
+}
 
+public enum AlgorithmTypeValidation
+{
+    TrainAndTest,
+    CrossValidation
 }
