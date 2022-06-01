@@ -10,20 +10,21 @@ await Parser.Default.ParseArguments<CommandLineOptions>(args)
         using StreamReader reader = new(args.Path ?? string.Empty);
         var readFile = ReadFileAsync(reader, args.Separator);
 
-        var confusionMatrix = new int[0, 0];
-        var notClassified = 0;
+        int[,] confusionMatrix;
+        int notClassified;
         switch (args.AlgorithmTypeValidation)
         {
             case AlgorithmTypeValidation.TrainAndTest:
                 (confusionMatrix, notClassified) = await TrainAndTest(readFile);
-                await confusionMatrix.Display();
                 break;
             case AlgorithmTypeValidation.CrossValidation:
+                (confusionMatrix, notClassified) = await CrossValidation(readFile, args.DataSetCount);
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
-
+        
+        await confusionMatrix.Display();
         await Display(confusionMatrix, notClassified);
         stopwatch.Stop();
         Console.WriteLine("\nElapsed time in milliseconds: {0}", stopwatch.ElapsedMilliseconds);
@@ -48,6 +49,27 @@ async ValueTask<(int[,] confusionMatrix, int notClassified)> TrainAndTest(ValueT
     await node.BuildTree();
     return await node.BuildConfusionMatrix(testSet.ToList(),
         trainingSet.ToList().Select(x => x.Last()).GroupBy(x => x).Select(x => x.Key).ToArray());
+}
+
+async ValueTask<(int[,] confusionMatrix, int notClassified)> CrossValidation(ValueTask<List<object[]>> readFile, int dataSetCount)
+{
+    var set = (await readFile.SplitData(dataSetCount)).ToArray();
+    var confusionMatrix = new int[0,0];
+    var notClassified = 0;
+    for (var i = 0; i < set.Length; i++)
+    {
+        var trainingSet = (await set.Where((_, idx) => idx != i).Zip()).ToList();
+        var testSet = set[i];
+        var node = new Node(trainingSet.ToList());
+        await node.BuildTree();
+        var (temporaryConfusionMatrix, temporaryNotClassified) = await node.BuildConfusionMatrix(testSet.ToList(),
+            trainingSet.ToList().Select(x => x.Last()).GroupBy(x => x).Select(x => x.Key).ToArray());
+
+        confusionMatrix = await confusionMatrix.Zip(temporaryConfusionMatrix);
+        notClassified += temporaryNotClassified;
+    }
+    
+    return (confusionMatrix, notClassified);
 }
 
 async Task Display(int[,] confusionMatrix, int notClassified)

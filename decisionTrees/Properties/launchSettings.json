@@ -10,7 +10,7 @@
     },
     "car": {
       "commandName": "Project",
-      "commandLineArgs": "-d ./data/car.data -s ,"
+      "commandLineArgs": "-d ./data/car.data -s , -a 1 -c 10"
     },
     "cancer": {
       "commandName": "Project",

@@ -13,7 +13,27 @@ public static class ArrayExtensions
 
         return (data, testSet);
     }
-    
+
+    public static async ValueTask<IEnumerable<IEnumerable<object[]>>> SplitData(
+        this ValueTask<List<object[]>> readFileAsync, int countOfSets)
+    {
+        var data = await readFileAsync;
+        var result = new List<IEnumerable<object[]>>();
+
+        var take = data.Count / countOfSets;
+
+        for (var i = 0; i < countOfSets; i++)
+        {
+            var set = i == countOfSets - 1 
+                ? data.ToArray()
+                : data.OrderBy(_ => Random.Shared.Next()).Take(take).ToArray();
+            foreach (var x in set) data.Remove(x);
+            result.Add(set);
+        }
+
+        return result;
+    }
+
     public static Task Display(this int[,] confusionMatrix)
     {
         Console.WriteLine("Fail matrix:");
@@ -53,11 +73,13 @@ public static class ArrayExtensions
 
         return (result, notClassified);
     }
-    
+
     public static Task<List<object[][]>> Sort(this IReadOnlyList<object[]> data, int idx)
     {
         var attribute = data.Select(el => el[idx]);
-        var result = attribute.GroupBy(x => x).Select(uniq => data.Where(d => d[idx].Equals(uniq.Key)).ToArray()).ToList();
+        var result = attribute.GroupBy(x => x)
+            .Select(uniq => data.Where(d => d[idx].Equals(uniq.Key)).ToArray())
+            .ToList();
 
         return Task.FromResult(result);
     }
@@ -66,13 +88,36 @@ public static class ArrayExtensions
     {
         var temporary = new List<double>();
 
-        foreach (var idx in Enumerable.Range(0, data[0].Length - 1))
-            temporary.Add(await Calculate(idx, data));
-        
+        foreach (var idx in Enumerable.Range(0, data[0].Length - 1)) temporary.Add(await Calculate(idx, data));
+
         var max = temporary.Max();
         return (Array.IndexOf(temporary.ToArray(), max), max);
     }
-    
+
+    public static Task<IEnumerable<object[]>> Zip(this IEnumerable<IEnumerable<object[]>>? list)
+    {
+        var result = new List<object[]>();
+
+        if (list == null) return Task.FromResult((IEnumerable<object[]>) result);
+        
+        foreach (var item in list)
+            result.AddRange(item);
+
+        return Task.FromResult((IEnumerable<object[]>)result);
+    }
+
+    public static ValueTask<int[,]> Zip(this int[,] firstArray, int[,] secondArray)
+    {
+        if (firstArray.GetLength(0) == 0)
+            firstArray = new int[secondArray.GetLength(0), secondArray.GetLength(1)];
+        
+        for (var i = 0; i < secondArray.GetLength(0); i++)
+            for (var j = 0; j < secondArray.GetLength(1); j++)
+                firstArray[i, j] += secondArray[i, j];
+        
+        return ValueTask.FromResult(firstArray);
+    }
+
     private static ValueTask<(object testDecision, object? treeDecision)> Test(IReadOnlyList<object> test, Node tree)
     {
         var node = tree;
@@ -81,7 +126,7 @@ public static class ArrayExtensions
 
         return ValueTask.FromResult((test[^1], node?.Decision));
     }
-    
+
     private static async ValueTask<double> Calculate(int idx, IReadOnlyList<object[]> data)
     {
         var values = data.Select(el => el[idx]).ToArray();
